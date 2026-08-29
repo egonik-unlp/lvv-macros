@@ -1,0 +1,12 @@
+[package]
+name = "lvv-macros"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+# lvv = { path = "../lvv-core/" }
+syn = "3.0.4"
+[lib]
+proc-macro = true
