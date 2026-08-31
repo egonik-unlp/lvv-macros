@@ -24,7 +24,6 @@ pub struct ParsedInnerField {
 }
 
 pub enum Modifier {
-    Flatten,
     Ignore,
     EndPoint,
 }

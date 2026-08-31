@@ -1,5 +1,5 @@
 use quote::quote;
-use syn::{Data::Struct, DeriveInput, Field, GenericArgument, Ident, PathArguments, Type};
+use syn::{Data::Struct, DeriveInput, Field, GenericArgument, PathArguments, Type};
 
 use crate::types::{RootField, RootFieldType};
 
@@ -43,11 +43,11 @@ fn resolve_point_field_type(field: &Field) -> RootFieldType {
     }
 }
 
-fn build_representation_from_field(field: &Field) -> VectorPointField {
+fn build_representation_from_field(field: &Field) -> RootField {
     let ty = (&field.ty).to_owned();
     let ident = field.ident.clone().unwrap();
     let field_type = resolve_point_field_type(field);
-    VectorPointField {
+    RootField {
         ty,
         ident,
         field_type,

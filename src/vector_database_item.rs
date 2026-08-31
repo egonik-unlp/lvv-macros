@@ -1,4 +1,4 @@
-use crate::types::{Command, InnerField, Modifier, RootFieldType, IDENTS};
+use crate::types::{Command, InnerField, Modifier, IDENTS};
 use heck::ToSnakeCase;
 use proc_macro::TokenStream;
 use quote::quote;
@@ -49,7 +49,7 @@ fn inspect_field(field: &Field) -> syn::Result<InnerField> {
         .attrs
         .clone()
         .into_iter()
-        .filter(|attr| attr.path().is_ident("vector_database"))
+        .filter(|attr| attr.path().is_ident("lvv"))
         .try_for_each(|attr| {
             attr.parse_nested_meta(|meta| {
                 let Some(comm) = IDENTS.into_iter().find(|ident| meta.path.is_ident(ident)) else {
@@ -57,7 +57,6 @@ fn inspect_field(field: &Field) -> syn::Result<InnerField> {
                 };
                 match comm {
                     "skip" => parsed_commands.push(Command::Skip),
-                    "flatten" => parsed_commands.push(Command::Flatten),
                     "rename" => {
                         let value: LitStr = meta.value()?.parse()?;
                         parsed_commands.push(Command::Rename(value.value()));
@@ -66,7 +65,7 @@ fn inspect_field(field: &Field) -> syn::Result<InnerField> {
                 }
                 Ok(())
             })
-        });
+        })?;
     if parsed_commands.len() > 2 {
         return Err(syn::Error::new_spanned(
             &field,
@@ -75,24 +74,13 @@ fn inspect_field(field: &Field) -> syn::Result<InnerField> {
     }
     let skip = parsed_commands
         .iter()
-        .find(|command| matches!(Command::Skip, command));
+        .find(|command| matches!(command, Command::Skip));
     let rename = parsed_commands.iter().find_map(|command| match command {
         Command::Rename(new_name) => Some(new_name.to_string()),
         _ => None,
     });
-    let flatten = parsed_commands
-        .iter()
-        .find(|command| matches!(Command::Flatten, command));
-    if flatten.is_some() && skip.is_some() {
-        return Err(syn::Error::new_spanned(
-            &field,
-            "You cannot skip and flatten at the same time",
-        ));
-    }
     let modifier = if skip.is_some() {
         Modifier::Ignore
-    } else if flatten.is_some() {
-        Modifier::Flatten
     } else {
         Modifier::EndPoint
     };
@@ -103,15 +91,11 @@ fn inspect_field(field: &Field) -> syn::Result<InnerField> {
     })
 }
 
-fn category(input: &InnerField) -> String {
-    input.ident.to_string().to_snake_case()
-}
-
 fn category_impl(input: &InnerField) -> proc_macro2::TokenStream {
     let cat = if let Some(new_name) = input.rename.clone() {
         new_name
     } else {
-        category(input)
+        input.ident.to_string().to_snake_case()
     };
     quote! {
         fn category(&self) -> String {
@@ -120,12 +104,20 @@ fn category_impl(input: &InnerField) -> proc_macro2::TokenStream {
     }
 }
 
-fn description_impl(input: &DeriveInput) -> proc_macro2::TokenStream {
+fn description_impl(input: &InnerField) -> proc_macro2::TokenStream {
+    let body = match input.modifier {
+        Modifier::EndPoint => quote! {
+            self.into_description()
+        },
+        Modifier::Ignore => unreachable!(),
+    };
     quote! {
         fn into_description(&self) -> String {
-            self.into_description_value()
+
         }
     }
 }
 
-fn payload_impl(input: &InnerField) -> proc_macro2::TokenStream {}
+fn into_payload() -> proc_macro2::TokenStream {
+    todo!()
+}
