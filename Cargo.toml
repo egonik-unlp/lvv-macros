@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
+heck = "0.5.0"
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
 # lvv = { path = "../lvv-core/" }

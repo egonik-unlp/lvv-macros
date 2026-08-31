@@ -1,6 +1,8 @@
 use quote::quote;
 use syn::{Data::Struct, DeriveInput, Field, GenericArgument, Ident, PathArguments, Type};
 
+use crate::types::{RootField, RootFieldType};
+
 pub fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let name = &input.ident;
     let data_struct = match &input.data {
@@ -30,27 +32,14 @@ pub fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     Ok(codegen)
 }
 
-enum VectorPointFieldType {
-    Collection,
-    OptionCollection,
-    Scalar,
-}
-
-struct VectorPointField {
-    #[allow(dead_code)]
-    ty: Type,
-    ident: Ident,
-    field_type: VectorPointFieldType,
-}
-
-fn resolve_point_field_type(field: &Field) -> VectorPointFieldType {
+fn resolve_point_field_type(field: &Field) -> RootFieldType {
     let field_ty = &field.ty;
     if is_vec(field_ty) {
-        VectorPointFieldType::Collection
+        RootFieldType::Collection
     } else if is_option_vec(field_ty) {
-        VectorPointFieldType::OptionCollection
+        RootFieldType::OptionCollection
     } else {
-        VectorPointFieldType::Scalar
+        RootFieldType::Scalar
     }
 }
 
@@ -64,23 +53,23 @@ fn build_representation_from_field(field: &Field) -> VectorPointField {
         field_type,
     }
 }
-fn generate_field_code(point_field: VectorPointField) -> proc_macro2::TokenStream {
-    let VectorPointField {
+fn generate_field_code(point_field: RootField) -> proc_macro2::TokenStream {
+    let RootField {
         ident, field_type, ..
     } = point_field;
     match field_type {
-        VectorPointFieldType::Collection => quote! {
+        RootFieldType::Collection => quote! {
             for item in &self.#ident {
                 points.push(item.try_into_database_item()?);
             }
         },
-        VectorPointFieldType::Scalar => quote! {
-            points.push(&self.#ident.try_into_database_item()?);
+        RootFieldType::Scalar => quote! {
+            points.push(self.#ident.try_into_database_item()?);
         },
-        VectorPointFieldType::OptionCollection => quote! {
+        RootFieldType::OptionCollection => quote! {
             if let Some(items) = &self.#ident {
                 for item in items {
-                    points.push(items.try_into_database_item()?);
+                    points.push(item.try_into_database_item()?);
                 }
             }
         },
@@ -88,16 +77,16 @@ fn generate_field_code(point_field: VectorPointField) -> proc_macro2::TokenStrea
 }
 
 fn is_vec(field_type: &Type) -> bool {
-    let Type::Path(tp) = &field_type else {
-        panic!("chau")
+    let Type::Path(tp) = field_type else {
+        return false;
     };
     let segment = tp.path.segments.last().unwrap();
     matches!(&segment.arguments, PathArguments::AngleBracketed(_)) && segment.ident.eq("Vec")
 }
 
 fn is_option_vec(field_type: &Type) -> bool {
-    let Type::Path(tp) = &field_type else {
-        panic!("chau")
+    let Type::Path(tp) = field_type else {
+        return false;
     };
     let segment = tp.path.segments.last().unwrap();
     let PathArguments::AngleBracketed(args) = &segment.arguments else {
