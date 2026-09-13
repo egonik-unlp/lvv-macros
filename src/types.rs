@@ -30,7 +30,7 @@ pub enum Modifier {
 
 pub const IDENTS: [&'static str; 2] = ["skip", "rename"];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     Flatten,
     Description,

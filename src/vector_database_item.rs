@@ -1,14 +1,11 @@
 use crate::{
-    attributes::parse_attributes,
-    types::{Command, InnerField, Modifier, IDENTS},
+    attributes::{parse_attributes, FieldWithAttributes},
+    types::{Command, InnerField, IDENTS},
 };
 use heck::ToSnakeCase;
-use proc_macro::TokenStream;
 use quote::quote;
 use std::todo;
-use syn::{
-    parse_macro_input, spanned::Spanned, token::In, Data::Struct, DeriveInput, Field, LitStr,
-};
+use syn::{Data::Struct, DeriveInput, Field, LitStr};
 // pub trait VectorDatabaseItem: DeserializeOwned + Serialize {
 //     fn category(&self) -> &'static str;
 //    fn into_description(&self) -> String;
@@ -42,8 +39,13 @@ pub fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         .iter()
         .map(|field| inspect_field(field))
         .collect();
-    let parsed_attributes = parse_attributes(data_struct, &["description", "skip"])?;
-    todo!()
+    let parsed_attributes = parse_attributes(data_struct, &["description", "skip", "rename"])?;
+    let temp_struct = generate_shadow_struct(parsed_attributes, &input);
+    let category_impl = category_impl(&input);
+    Ok(quote! {
+        #temp_struct
+        #category_impl
+    })
 }
 
 fn inspect_field(field: &Field) -> syn::Result<InnerField> {
@@ -57,7 +59,11 @@ fn inspect_field(field: &Field) -> syn::Result<InnerField> {
         .try_for_each(|attr| {
             attr.parse_nested_meta(|meta| {
                 let Some(comm) = IDENTS.into_iter().find(|ident| meta.path.is_ident(ident)) else {
-                    return Err(meta.error("unsupported vector_database command"));
+                    let erri = format!(
+                        "{:?} is an unsupported lvv command",
+                        meta.path.get_ident().unwrap()
+                    );
+                    return Err(meta.error(erri));
                 };
                 match comm {
                     "skip" => parsed_commands.push(Command::Skip),
@@ -85,28 +91,143 @@ fn inspect_field(field: &Field) -> syn::Result<InnerField> {
     })
 }
 
-// Final
-fn category_impl(input: &InnerField) -> proc_macro2::TokenStream {
-    let cat = if let Some(new_name) = input.rename.clone() {
-        new_name
-    } else {
-        input.ident.to_string().to_snake_case()
+fn category_impl(input: &DeriveInput) -> proc_macro2::TokenStream {
+    let ident = input.clone().ident;
+    let ident_string = ident.to_string();
+    quote! {
+        impl #ident {
+            fn category() -> String {
+                #ident_string
+            }
+        }
+    }
+}
+
+fn generate_shadow_struct(
+    fields: Vec<FieldWithAttributes>,
+    input: &DeriveInput,
+) -> proc_macro2::TokenStream {
+    let ident = input.clone().ident;
+    let shadow_name = quote! {ShadowStruct};
+    let mut shadow_generics = input.generics.clone();
+    shadow_generics
+        .params
+        .insert(0, syn::GenericParam::Lifetime(syn::parse_quote!( '__l   )));
+    let (_, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (shadow_impl, shadow_ty, _) = shadow_generics.split_for_impl();
+    let fields_with_types = fields
+        .clone()
+        .into_iter()
+        .filter(|f| !f.attributes.contains(&Command::Skip))
+        .flat_map(|fwa| {
+            fwa.field.ident.map(move |i| {
+                let ty = fwa.field.ty;
+                quote! { #i: &'__l #ty, }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let fields_assigned = fields
+        .into_iter()
+        .filter(|f| !f.attributes.contains(&Command::Skip))
+        .flat_map(|fwa| fwa.field.ident.map(move |i| quote! { #i: &self.#i, }))
+        .collect::<Vec<_>>();
+    let converted_value = quote! {
+            &#shadow_name {
+                category: self.category(),
+                #(#fields_assigned)*
+            }
     };
     quote! {
-        fn category(&self) -> String {
-            #cat
-        }
-    }
-}
-//TODO: Write
-fn description_impl(input: &InnerField) -> proc_macro2::TokenStream {
-    quote! {
-        fn into_description(&self) -> String {
+        let _: () = {
+            #[derive(Serialize, Deserialize)]
+            struct #shadow_name #shadow_impl #where_clause {
+                category: String,
+                #(#fields_with_types)*
+            }
 
-        }
+            impl #ident {
+                fn into_payload(&self) -> anyhow::Result<Payload> {
+                    let converted_value = #converted_value;
+                    let payload: Payload = serde_json::to_value(converted_value)
+                    .map_err(|err| anyhow::anyhow!(err))?
+                    .try_into()?;
+                Ok(payload)
+            }
+
+
+
+            }
+        };
     }
 }
-// TODO: Solve
-fn into_payload() -> proc_macro2::TokenStream {
-    todo!()
+
+#[cfg(test)]
+pub mod test {
+    use syn::{parse_quote, Data};
+
+    use super::*;
+    fn helper_struct() -> syn::Result<(Vec<FieldWithAttributes>, DeriveInput)> {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Debug, Clone, Serialize, Deserialize)]
+            struct ResearchArticle<'a> {
+                /// Upstream identifier, never embedded
+                #[lvv(skip)]
+                id: u64,
+                #[lvv(rename = "headline")]
+                #[lvv(description)]
+                title: String,
+                #[serde(rename = "abstract")]
+                #[lvv(description)]
+                abstract_text: Option<String>,
+                #[serde(default)]
+                authors: Vec<Author>,
+                #[lvv(rename = "keywords")]
+                tags: Option<Vec<String>>,
+                #[lvv(skip)]
+                #[serde(skip_serializing)]
+                raw_html: &'a str,
+                published_at: chrono::DateTime<chrono::Utc>,
+                #[lvv(rename = "citations")]
+                citation_counts: std::collections::HashMap<String, u32>,
+                #[lvv(skip)]
+                #[lvv(rename = "vector")]
+                embedding: [f32; 768],
+                doi: Option<&'a str>,
+                related: Vec<(u64, f32)>,
+            }
+        };
+        let Data::Struct(data) = input.clone().data else {
+            panic!()
+        };
+
+        parse_attributes(&data, &["rename", "skip", "description"]).map(|f| (f, input))
+    }
+
+    #[test]
+    fn lets_see() {
+        let (fields, input) = helper_struct().unwrap();
+        let res = generate_shadow_struct(fields, &input);
+
+        let wrapped = quote! { fn __preview() { #res } };
+
+        match syn::parse2::<syn::File>(wrapped) {
+            Ok(file) => println!("{}", prettyplease::unparse(&file)),
+            Err(e) => println!("--- unparseable: {e} ---\n{res}"),
+        }
+    }
+
+    #[test]
+    fn lets_see_more() -> syn::Result<()> {
+        let (_, input) = helper_struct().unwrap();
+        let res = expand(input)?;
+
+        let wrapped = quote! { fn __preview() { #res } };
+
+        match syn::parse2::<syn::File>(wrapped) {
+            Ok(file) => println!("{}", prettyplease::unparse(&file)),
+            Err(e) => println!("--- unparseable: {e} ---\n{res}"),
+        };
+        Ok(())
+    }
 }
