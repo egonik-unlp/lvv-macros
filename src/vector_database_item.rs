@@ -40,11 +40,13 @@ pub fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         .map(|field| inspect_field(field))
         .collect();
     let parsed_attributes = parse_attributes(data_struct, &["description", "skip", "rename"])?;
-    let temp_struct = generate_shadow_struct(parsed_attributes, &input);
+    let temp_struct = generate_shadow_struct(parsed_attributes.clone(), &input);
+    let temp_struct_description = generate_description_shadow_struct(parsed_attributes, &input);
     let category_impl = category_impl(&input);
     Ok(quote! {
-        #temp_struct
         #category_impl
+        #temp_struct_description
+        #temp_struct
     })
 }
 
@@ -103,6 +105,75 @@ fn category_impl(input: &DeriveInput) -> proc_macro2::TokenStream {
     }
 }
 
+fn generate_description_shadow_struct(
+    fields: Vec<FieldWithAttributes>,
+    input: &DeriveInput,
+) -> proc_macro2::TokenStream {
+    let ident = input.clone().ident;
+    let shadow_name = quote! {ShadowStruct};
+    let mut shadow_generics = input.generics.clone();
+    shadow_generics
+        .params
+        .insert(0, syn::GenericParam::Lifetime(syn::parse_quote!( '__l   )));
+    let (_, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (shadow_impl, shadow_ty, _) = shadow_generics.split_for_impl();
+    let fields_with_types = fields
+        .clone()
+        .into_iter()
+        .filter(|f| !f.attributes.contains(&Command::Skip))
+        .filter(|field| {
+            field
+                .attributes
+                .iter()
+                .any(|attr| matches!(attr, Command::Description))
+        })
+        .flat_map(|fwa| {
+            fwa.field.ident.map(move |i| {
+                let ty = fwa.field.ty;
+                quote! { #i: &'__l #ty, }
+            })
+        })
+        .collect::<Vec<_>>();
+    let fields_assigned = fields
+        .into_iter()
+        .filter(|f| !f.attributes.contains(&Command::Skip))
+        .filter(|field| {
+            field
+                .attributes
+                .iter()
+                .any(|attr| matches!(attr, Command::Description))
+        })
+        .flat_map(|fwa| fwa.field.ident.map(move |i| quote! { #i: &self.#i, }))
+        .collect::<Vec<_>>();
+    let converted_value = quote! {
+            &#shadow_name {
+                #(#fields_assigned)*
+            }
+    };
+    quote! {
+        let _: () = {
+            #[derive(Serialize, Deserialize)]
+            struct #shadow_name #shadow_impl #where_clause {
+                category: String,
+                #(#fields_with_types)*
+            }
+
+            impl #ident {
+                fn into_description(&self) -> anyhow::Result<Payload> {
+                    let converted_value = #converted_value;
+                    let payload: Payload = serde_json::to_value(converted_value)
+                    .map_err(|err| anyhow::anyhow!(err))?
+                    .try_into()?;
+                Ok(payload)
+            }
+
+
+
+            }
+        };
+    }
+}
+
 fn generate_shadow_struct(
     fields: Vec<FieldWithAttributes>,
     input: &DeriveInput,
@@ -126,7 +197,16 @@ fn generate_shadow_struct(
             })
         })
         .collect::<Vec<_>>();
-
+    let description_fields: Vec<_> = fields
+        .clone()
+        .into_iter()
+        .filter(|field| {
+            field
+                .attributes
+                .iter()
+                .any(|attr| matches!(attr, Command::Description))
+        })
+        .collect();
     let fields_assigned = fields
         .into_iter()
         .filter(|f| !f.attributes.contains(&Command::Skip))

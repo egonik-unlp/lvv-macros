@@ -53,6 +53,7 @@ fn build_representation_from_field(field: &Field) -> RootField {
         field_type,
     }
 }
+
 fn generate_field_code(point_field: RootField) -> proc_macro2::TokenStream {
     let RootField {
         ident, field_type, ..
