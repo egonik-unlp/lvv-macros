@@ -15,8 +15,8 @@ pub struct RootField {
 
 pub struct InnerField {
     pub ident: Ident,
-    pub modifier: Modifier,
     pub rename: Option<String>,
+    pub skip: bool,
 }
 pub struct ParsedInnerField {
     pub ident: Ident,
@@ -28,10 +28,12 @@ pub enum Modifier {
     EndPoint,
 }
 
-pub const IDENTS: [&'static str; 3] = ["skip", "rename", "flatten"];
+pub const IDENTS: [&'static str; 2] = ["skip", "rename"];
 
+#[derive(Debug, Clone)]
 pub enum Command {
     Flatten,
+    Description,
     Rename(String),
     Skip,
 }

@@ -1,5 +1,6 @@
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
+mod attributes;
 mod types;
 mod vector_database;
 mod vector_database_item;

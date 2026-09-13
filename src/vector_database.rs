@@ -21,7 +21,7 @@ pub fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         .collect();
 
     let codegen = quote! {
-        impl lvv::transform::transform::VectorDatabase for #name {
+        impl ::lvv::transform::transform::VectorDatabase for #name {
             fn point_drafts(&self) -> anyhow::Result<Vec<lvv::transform::transform::VectorPointDraft>> {
                 let mut points = Vec::new();
                 #(#field_code)*
