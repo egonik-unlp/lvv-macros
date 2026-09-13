@@ -1,4 +1,4 @@
-use syn::{spanned::Spanned, DataStruct, Field, LitStr};
+use syn::{DataStruct, Field, LitStr};
 
 use crate::types::Command;
 

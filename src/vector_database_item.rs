@@ -1,11 +1,9 @@
 use crate::{
     attributes::{parse_attributes, FieldWithAttributes},
-    types::{Command, InnerField, IDENTS},
+    types::Command,
 };
-use heck::ToSnakeCase;
 use quote::quote;
-use std::todo;
-use syn::{Data::Struct, DeriveInput, Field, LitStr};
+use syn::{Data::Struct, DeriveInput};
 // pub trait VectorDatabaseItem: DeserializeOwned + Serialize {
 //     fn category(&self) -> &'static str;
 //    fn into_description(&self) -> String;
@@ -25,7 +23,6 @@ use syn::{Data::Struct, DeriveInput, Field, LitStr};
 //     }
 // }
 pub fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let name = &input.ident;
     let data_struct = match &input.data {
         Struct(data) => data,
         _ => {
@@ -34,11 +31,6 @@ pub fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             );
         }
     };
-    let parsed_fields: Vec<_> = data_struct
-        .fields
-        .iter()
-        .map(|field| inspect_field(field))
-        .collect();
     let parsed_attributes = parse_attributes(data_struct, &["description", "skip", "rename"])?;
     let temp_struct = generate_shadow_struct(parsed_attributes.clone(), &input);
     let temp_struct_description = generate_description_shadow_struct(parsed_attributes, &input);
@@ -47,49 +39,6 @@ pub fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         #category_impl
         #temp_struct_description
         #temp_struct
-    })
-}
-
-fn inspect_field(field: &Field) -> syn::Result<InnerField> {
-    let mut parsed_commands = vec![];
-    let ident = field.ident.clone().unwrap();
-    field
-        .attrs
-        .clone()
-        .into_iter()
-        .filter(|attr| attr.path().is_ident("lvv"))
-        .try_for_each(|attr| {
-            attr.parse_nested_meta(|meta| {
-                let Some(comm) = IDENTS.into_iter().find(|ident| meta.path.is_ident(ident)) else {
-                    let erri = format!(
-                        "{:?} is an unsupported lvv command",
-                        meta.path.get_ident().unwrap()
-                    );
-                    return Err(meta.error(erri));
-                };
-                match comm {
-                    "skip" => parsed_commands.push(Command::Skip),
-                    "rename" => {
-                        let value: LitStr = meta.value()?.parse()?;
-                        parsed_commands.push(Command::Rename(value.value()));
-                    }
-                    _ => unreachable!(),
-                }
-                Ok(())
-            })
-        })?;
-    // handle this differently because i removed the enum in the type
-    let skip = parsed_commands
-        .iter()
-        .any(|command| matches!(command, Command::Skip));
-    let rename = parsed_commands.iter().find_map(|command| match command {
-        Command::Rename(new_name) => Some(new_name.to_string()),
-        _ => None,
-    });
-    Ok(InnerField {
-        ident,
-        skip,
-        rename,
     })
 }
 
@@ -197,16 +146,6 @@ fn generate_shadow_struct(
             })
         })
         .collect::<Vec<_>>();
-    let description_fields: Vec<_> = fields
-        .clone()
-        .into_iter()
-        .filter(|field| {
-            field
-                .attributes
-                .iter()
-                .any(|attr| matches!(attr, Command::Description))
-        })
-        .collect();
     let fields_assigned = fields
         .into_iter()
         .filter(|f| !f.attributes.contains(&Command::Skip))
