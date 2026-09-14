@@ -56,8 +56,8 @@
 //! # }
 //! ```
 //!
-//! For a complete program that also embeds the points with Ollama and stores
-//! them in Qdrant, see lvv's
+//! For a complete lvv pipeline built on these derives, from reading files to
+//! writing Qdrant collections, see lvv's
 //! [`examples/derive.rs`](https://github.com/egonik-unlp/lvv/blob/main/examples/derive.rs).
 
 use proc_macro::TokenStream;

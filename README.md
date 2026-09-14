@@ -53,13 +53,15 @@ let drafts = portfolio.point_drafts()?;
 ## Example
 
 lvv's [`examples/derive.rs`](https://github.com/egonik-unlp/lvv/blob/main/examples/derive.rs)
-is a complete program that uses both derives: it prints the points of a small
-portfolio, embeds them with Ollama and stores them in Qdrant. From a clone of
+is a complete lvv pipeline over structs that use these derives. It reads
+records from JSON Lines, CSV and JSON files, turns them into points, embeds the
+descriptions with Ollama using a cache, and runs a job queue that writes one
+Qdrant collection per category. From a clone of
 [lvv](https://github.com/egonik-unlp/lvv):
 
 ```sh
-cargo run --example derive --features derive                  # print the points
-cargo run --example derive --features derive -- --embed       # embed with Ollama
+cargo run --example derive --features derive                  # load and print the points
+cargo run --example derive --features derive -- --embed       # embed and build the jobs
 cargo run --example derive --features derive -- --embed --qdrant http://localhost:6334
 ```
 
