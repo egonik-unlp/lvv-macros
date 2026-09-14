@@ -1,15 +1,16 @@
-use syn::{Ident, Type};
+use syn::Member;
 
 pub enum RootFieldType {
     Collection,
     OptionCollection,
+    OptionScalar,
     Scalar,
+    Map,
+    OptionMap,
 }
 
 pub struct RootField {
-    #[allow(dead_code)]
-    pub ty: Type,
-    pub ident: Ident,
+    pub member: Member,
     pub field_type: RootFieldType,
 }
 

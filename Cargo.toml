@@ -1,14 +1,25 @@
 [package]
 name = "lvv-macros"
-version = "0.0.0"
+version = "0.1.1"
 edition = "2021"
+license = "Apache-2.0"
+description = "Derive macros for lvv: turn Rust structs into vector points with #[derive(VectorDatabaseItem)] and #[derive(VectorDatabase)]."
+repository = "https://github.com/egonik-unlp/lvv-macros"
+homepage = "https://github.com/egonik-unlp/lvv"
+documentation = "https://docs.rs/lvv-macros"
+readme = "README.md"
+keywords = ["embeddings", "qdrant", "derive", "vector", "lvv"]
+categories = ["database"]
 
 [dependencies]
 heck = "0.5.0"
-prettyplease = "0.3.0"
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
 # lvv = { path = "../lvv-core/" }
 syn = "3.0.4"
+
+[dev-dependencies]
+prettyplease = "0.3.0"
+
 [lib]
 proc-macro = true
