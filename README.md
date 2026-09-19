@@ -21,7 +21,7 @@ serde = { version = "1", features = ["derive"] }
 ```
 
 ```rust,ignore
-use lvv::transform::transform::{VectorDatabase, VectorDatabaseItem};
+use lvv::points::{VectorDatabase, VectorDatabaseItem};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, VectorDatabaseItem)]

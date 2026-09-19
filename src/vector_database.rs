@@ -28,13 +28,13 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
         .collect();
 
     Ok(quote! {
-        impl #impl_generics ::lvv::transform::transform::VectorDatabase for #name #ty_generics #where_clause {
+        impl #impl_generics ::lvv::points::VectorDatabase for #name #ty_generics #where_clause {
             fn point_drafts(
                 &self,
-            ) -> ::lvv::__private::anyhow::Result<::std::vec::Vec<::lvv::transform::transform::VectorPointDraft>> {
+            ) -> ::std::result::Result<::std::vec::Vec<::lvv::points::VectorPointDraft>, ::lvv::points::PointError> {
                 // Method syntax (auto-deref through `&`, `Box`, ...) without making
                 // the caller import the trait.
-                use ::lvv::transform::transform::VectorDatabaseItem as _;
+                use ::lvv::points::VectorDatabaseItem as _;
                 let mut points = ::std::vec::Vec::new();
                 #(#field_code)*
                 ::std::result::Result::Ok(points)
