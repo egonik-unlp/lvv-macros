@@ -9,7 +9,7 @@
 //!   item it holds.
 //!
 //! Both implement traits from
-//! [`lvv::transform::transform`](https://docs.rs/lvv/latest/lvv/transform/transform/index.html).
+//! [`lvv::points`](https://docs.rs/lvv/latest/lvv/points/index.html).
 //! The generated code refers to `::lvv`, so the crate using the derives must
 //! depend on `lvv` under that name. Enable lvv's `derive` feature instead of
 //! depending on this crate directly; it re-exports both macros next to the
@@ -24,7 +24,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use lvv::transform::transform::{VectorDatabase, VectorDatabaseItem};
+//! use lvv::points::{VectorDatabase, VectorDatabaseItem};
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Serialize, Deserialize, VectorDatabaseItem)]
@@ -47,7 +47,7 @@
 //!     owner: String,
 //! }
 //!
-//! # fn index(portfolio: &Portfolio) -> anyhow::Result<()> {
+//! # fn index(portfolio: &Portfolio) -> Result<(), lvv::points::PointError> {
 //! for draft in portfolio.point_drafts()? {
 //!     // Embed `draft.description`, store `draft.payload` next to the vector.
 //!     println!("{}: {}", draft.category, draft.description);
@@ -103,7 +103,7 @@ mod vector_database_item;
 /// # Example
 ///
 /// ```rust,ignore
-/// use lvv::transform::transform::VectorDatabase;
+/// use lvv::points::VectorDatabase;
 ///
 /// #[derive(VectorDatabase)]
 /// struct Portfolio {
@@ -178,7 +178,7 @@ pub fn vector_database(input: TokenStream) -> TokenStream {
 /// # Example
 ///
 /// ```rust,ignore
-/// use lvv::transform::transform::VectorDatabaseItem;
+/// use lvv::points::VectorDatabaseItem;
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Serialize, Deserialize, VectorDatabaseItem)]

@@ -29,12 +29,12 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     });
     for fwa in fields.iter().filter(|fwa| fwa.is_description()) {
         let ty = &fwa.field.ty;
-        predicates.push(parse_quote!(#ty: ::lvv::transform::transform::IntoDescriptionValue));
+        predicates.push(parse_quote!(#ty: ::lvv::points::IntoDescriptionValue));
     }
     let (impl_generics, _, where_clause) = generics.split_for_impl();
 
     Ok(quote! {
-        impl #impl_generics ::lvv::transform::transform::VectorDatabaseItem for #ident #ty_generics #where_clause {
+        impl #impl_generics ::lvv::points::VectorDatabaseItem for #ident #ty_generics #where_clause {
             fn category(&self) -> ::std::string::String {
                 ::std::string::String::from(#category)
             }
@@ -67,7 +67,7 @@ fn description_impl(
     Ok(quote! {
         fn into_description(&self) -> ::std::string::String {
             let parts: ::std::vec::Vec<::std::string::String> = ::std::vec![
-                #(::lvv::transform::transform::IntoDescriptionValue::into_description_value(&self.#members)),*
+                #(::lvv::points::IntoDescriptionValue::into_description_value(&self.#members)),*
             ];
             parts
                 .into_iter()
@@ -117,7 +117,10 @@ fn payload_impl(
     let object = match shape {
         Fields::Named(_) => quote! {
             let Value::Object(mut object) = value else {
-                ::lvv::__private::anyhow::bail!("`{}` did not serialize to a JSON object", #category);
+                return ::std::result::Result::Err(::lvv::points::PointError::Shape {
+                    category: ::std::string::String::from(#category),
+                    expected: ::std::string::String::from("object"),
+                });
             };
         },
         // Newtypes serialize as their inner value.
@@ -127,7 +130,10 @@ fn payload_impl(
         },
         Fields::Unnamed(_) => quote! {
             let Value::Array(values) = value else {
-                ::lvv::__private::anyhow::bail!("`{}` did not serialize to a JSON array", #category);
+                return ::std::result::Result::Err(::lvv::points::PointError::Shape {
+                    category: ::std::string::String::from(#category),
+                    expected: ::std::string::String::from("array"),
+                });
             };
             let mut object: Map<::std::string::String, Value> = values
                 .into_iter()
@@ -142,7 +148,7 @@ fn payload_impl(
     };
 
     Ok(quote! {
-        fn into_payload(&self) -> ::lvv::__private::anyhow::Result<::lvv::__private::Payload> {
+        fn into_payload(&self) -> ::std::result::Result<::lvv::__private::Payload, ::lvv::points::PointError> {
             use ::lvv::__private::serde_json::{self, Map, Value};
 
             let value = serde_json::to_value(self)?;
