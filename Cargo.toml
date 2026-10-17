@@ -8,6 +8,7 @@ repository = "https://github.com/egonik-unlp/lvv-macros"
 homepage = "https://github.com/egonik-unlp/lvv"
 documentation = "https://docs.rs/lvv-macros"
 readme = "README.md"
+exclude = ["assets/"]
 keywords = ["embeddings", "qdrant", "derive", "vector", "lvv"]
 categories = ["database"]
 
